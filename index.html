@@ -1,262 +1,86 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PureSun - Zero-Processing Sunset Camera (PWA-ready)</title>
-  <style>
-    :root{--bg:#0b0b0b;--fg:#eaeaea;--muted:#9aa0a6;--accent:#ff8c00}
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,#050505,#111);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
-    .app{max-width:900px;margin:12px auto;padding:12px}
-    header{display:flex;gap:12px;align-items:center}
-    h1{font-size:1.05rem;margin:0}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .panel{background:rgba(255,255,255,0.03);padding:8px;border-radius:8px}
-    #preview{width:100%;height:360px;background:#000;display:block;border-radius:8px;object-fit:cover}
-    .row{display:flex;gap:8px;align-items:center}
-    label{font-size:0.82rem;color:var(--muted)}
-    input[type=range]{width:160px}
-    button{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;color:var(--fg);cursor:pointer}
-    button.primary{background:var(--accent);border-color:transparent}
-    canvas.hist{width:100%;height:80px;border-radius:6px;background:#000;margin-top:8px}
-    .hint{font-size:0.78rem;color:var(--muted)}
-    .footer{margin-top:12px;font-size:0.78rem;color:var(--muted)}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PureSun Camera</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: black;
+  }
+  video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* natural mirror view for front camera */
+  }
+  #captureButton {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 25px;
+    font-size: 18px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 2px solid white;
+    color: white;
+    border-radius: 50px;
+    cursor: pointer;
+    user-select: none;
+  }
+  #captureButton:active {
+    background: rgba(255, 255, 255, 0.5);
+  }
+</style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>PureSun — Zero-Processing Sunset Camera</h1>
-      <div class="hint">(Web version — works on modern Android browsers. See notes below for limitations and native alternatives.)</div>
-    </header>
 
-    <section class="panel" id="cameraPanel">
-      <video id="preview" autoplay playsinline></video>
-
-      <div class="controls">
-        <div>
-          <div class="row"><label>Camera</label><select id="deviceSelect"></select></div>
-          <div class="row"><label>Facing</label>
-            <button id="facingToggle">Toggle</button>
-            <span class="hint" id="facingHint"></span>
-          </div>
-        </div>
-
-        <div>
-          <div class="row"><label>Shutter / Exposure (if supported)</label></div>
-          <div class="row"><input id="exposureRange" type="range" min="1" max="100" value="50"><span id="exposureVal"></span></div>
-
-          <div class="row"><label>ISO (if supported)</label></div>
-          <div class="row"><input id="isoRange" type="range" min="100" max="3200" step="1" value="400"><span id="isoVal"></span></div>
-
-          <div class="row"><label>White Balance</label>
-            <select id="wbSelect"><option value="auto">Auto</option><option value="daylight">Daylight</option><option value="cloudy">Cloudy</option><option value="shade">Shade</option><option value="tungsten">Tungsten</option></select>
-          </div>
-        </div>
-
-        <div>
-          <div class="row"><label>Tripod Mode</label><input type="checkbox" id="tripodMode"></div>
-          <div class="row"><label>Disable HDR / Processing</label><input type="checkbox" id="disableProcessing" checked></div>
-          <div class="row"><label>Embed GPS</label><input type="checkbox" id="embedGps"></div>
-        </div>
-      </div>
-
-      <canvas id="histogram" class="hist"></canvas>
-
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="captureBtn" class="primary">Capture (No Post-Processing)</button>
-        <button id="bracketBtn">Bracket x3</button>
-        <button id="lockBtn">Lock AE/AF</button>
-        <a id="downloadLink" style="display:none"></a>
-      </div>
-
-      <div class="footer">
-        <strong>Notes:</strong> The web platform limits access to RAW streams and full camera2 controls. This app will attempt to request manual controls from the browser; when unavailable, it will warn you. For true RAW with guaranteed zero in-camera processing, a native Android (camera2/cameraX) app is recommended (instructions below).
-      </div>
-    </section>
-
-    <section class="panel" style="margin-top:12px">
-      <h2 style="margin:0">Suggested additions and best-practice checklist for optimum sunset photos</h2>
-      <ul>
-        <li>Tripod mount + remote shutter (or 2s timer) to avoid camera shake at slow shutter speeds.</li>
-        <li>Manual exposure controls (shutter speed, ISO) and exposure compensation control — include exposure lock.</li>
-        <li>Histogram and highlight clipping overlay (zebra) so you can protect highlights when shooting sunsets.</li>
-        <li>White balance presets (Daylight/Cloudy/Incandescent) and manual Kelvin slider.</li>
-        <li>RAW capture (DNG) and option to save an untouched RAW file — requires native Android app access (camera2 API) or third-party app like Open Camera or Lightroom Mobile.</li>
-        <li>Bracketed capture (exposure bracket) to ensure you can choose the best-exposed frame or merge later (if you must process later) — but keep an untouched original per frame.</li>
-        <li>Geo-tagging and accurate timestamping embedded at capture time (EXIF). Avoid any re-encoding which may alter data.</li>
-        <li>Disable any automatic HDR, noise reduction, or face-enhance modes in the camera pipeline.</li>
-        <li>Use a lens hood / shade and aim to expose for highlights — sunsets tend to blow highlights quickly.</li>
-      </ul>
-
-      <p class="hint">Tip: For guaranteed "zero post-processing" you should either: 1) use a native Android app that saves RAW/DNG with NO in-camera processing (Camera2 API in RAW mode), or 2) use a dedicated camera and transfer the original files. The browser can produce excellent results but may still apply driver-level processing beyond the web app's control.</p>
-    </section>
-
-    <section class="panel" style="margin-top:12px">
-      <h2 style="margin:0">Native alternative (recommended for strict zero-processing)</h2>
-      <p class="hint">If you need strict zero-processing and RAW output, build a small native Android app (Kotlin/Java) using the Camera2 API (or CameraX with RAW support). Key points:</p>
-      <ol>
-        <li>Request <code>android.permission.CAMERA</code> and <code>WRITE_EXTERNAL_STORAGE</code> and, if needed, location permission for geotagging.</li>
-        <li>Use <code>CaptureRequest.CONTROL_MODE</code> = <code>OFF</code> and set manual exposure (<code>SENSOR_EXPOSURE_TIME</code>, <code>SENSOR_SENSITIVITY</code>) and <code>TONEMAP_MODE</code> = OFF to minimise processing.</li>
-        <li>Capture in RAW (DNG) using <code>ImageFormat.RAW_SENSOR</code> and write the DNG file directly — no compression, no ISP post-processing.</li>
-        <li>Also: store a small JSON sidecar with exact capture parameters for provenance.</li>
-      </ol>
-    </section>
-
-    <footer class="hint" style="margin-top:12px">Built for you — single-file HTML/PWA. Scroll up, pick controls, and press Capture. I included many feature-detection fallbacks and warnings.</footer>
-  </div>
+<video id="camera" autoplay playsinline></video>
+<button id="captureButton">📸</button>
+<canvas id="canvas" style="display:none;"></canvas>
 
 <script>
-(async function(){
-  const video = document.getElementById('preview');
-  const deviceSelect = document.getElementById('deviceSelect');
-  const captureBtn = document.getElementById('captureBtn');
-  const bracketBtn = document.getElementById('bracketBtn');
-  const lockBtn = document.getElementById('lockBtn');
-  const exposureRange = document.getElementById('exposureRange');
-  const exposureVal = document.getElementById('exposureVal');
-  const isoRange = document.getElementById('isoRange');
-  const isoVal = document.getElementById('isoVal');
-  const wbSelect = document.getElementById('wbSelect');
-  const facingToggle = document.getElementById('facingToggle');
-  const histCanvas = document.getElementById('histogram');
-  const ctxHist = histCanvas.getContext('2d');
-  const disableProcessing = document.getElementById('disableProcessing');
-  const tripodMode = document.getElementById('tripodMode');
-  const embedGps = document.getElementById('embedGps');
+(async () => {
+  try {
+    const constraints = {
+      video: {
+        facingMode: "user" // front camera
+      },
+      audio: false
+    };
 
-  let stream = null; let track = null; let imageCapture = null; let isLocked=false; let currentFacing='environment';
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('camera');
+    video.srcObject = stream;
 
-  function logWarn(msg){console.warn(msg)}
+    const captureButton = document.getElementById('captureButton');
+    const canvas = document.getElementById('canvas');
 
-  async function listDevices(){
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    deviceSelect.innerHTML = '';
-    devices.filter(d=>d.kind==='videoinput').forEach(d=>{
-      const opt = document.createElement('option'); opt.value = d.deviceId; opt.textContent = d.label || `Camera ${deviceSelect.length+1}`; deviceSelect.appendChild(opt);
-    })
+    captureButton.addEventListener('click', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = image;
+      a.download = 'photo.png';
+      a.click();
+    });
+
+  } catch (err) {
+    alert('Camera access denied or unavailable.');
+    console.error(err);
   }
-
-  async function startStream(deviceId){
-    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
-    const constraints = {video:{deviceId:deviceId?{exact:deviceId}:undefined,facingMode:currentFacing,width:{ideal:4000},height:{ideal:3000}}};
-    try{
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      video.srcObject = stream; track = stream.getVideoTracks()[0];
-      try{ imageCapture = new ImageCapture(track);}catch(e){imageCapture = null}
-      await listCapabilities();
-      requestAnimationFrame(drawHistogram);
-    }catch(e){alert('Failed to access camera: '+e.message)}
-  }
-
-  async function listCapabilities(){
-    if(!track) return;
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-    // attempt to wire UI to capabilities (best-effort)
-    if(capabilities.exposureTime){exposureRange.min = capabilities.exposureTime.min; exposureRange.max = capabilities.exposureTime.max; exposureRange.value = Math.min(capabilities.exposureTime.max, Math.max(capabilities.exposureTime.min, (capabilities.exposureTime.min+capabilities.exposureTime.max)/2));}
-    exposureVal.textContent = exposureRange.value;
-    if(capabilities.iso){isoRange.min = capabilities.iso.min; isoRange.max = capabilities.iso.max; isoRange.value = capabilities.iso.min||100;}
-    isoVal.textContent = isoRange.value;
-  }
-
-  deviceSelect.addEventListener('change', ()=>startStream(deviceSelect.value));
-  facingToggle.addEventListener('click', ()=>{currentFacing = currentFacing==='environment'?'user':'environment'; startStream();});
-
-  exposureRange.addEventListener('input', async ()=>{
-    exposureVal.textContent = exposureRange.value;
-    if(track && track.applyConstraints){
-      try{ await track.applyConstraints({advanced:[{exposureTime:parseFloat(exposureRange.value)}]}); }catch(e){/*ignore*/}
-    }
-  });
-  isoRange.addEventListener('input', async ()=>{
-    isoVal.textContent = isoRange.value;
-    if(track && track.applyConstraints){
-      try{ await track.applyConstraints({advanced:[{iso:parseFloat(isoRange.value)}]}); }catch(e){/*ignore*/}
-    }
-  });
-
-  lockBtn.addEventListener('click', async ()=>{
-    if(!track||!track.applyConstraints) return alert('Lock not supported by browser');
-    if(!isLocked){
-      try{ await track.applyConstraints({advanced:[{exposureMode:'manual',focusMode:'manual'}]}); isLocked=true; lockBtn.textContent='Unlock AE/AF'; }catch(e){alert('Lock not available: '+e.message)}
-    }else{
-      try{ await track.applyConstraints({advanced:[{exposureMode:'continuous',focusMode:'continuous'}]}); isLocked=false; lockBtn.textContent='Lock AE/AF'; }catch(e){}
-    }
-  });
-
-  captureBtn.addEventListener('click', takePhoto);
-  bracketBtn.addEventListener('click', ()=>bracketCapture(3));
-
-  async function takePhoto(){
-    if(!track){alert('No camera');return}
-    if(imageCapture && imageCapture.takePhoto){
-      try{
-        // hint to disable processing where possible
-        const opts = {};
-        if(disableProcessing.checked) opts.imageProcessing = 'none';
-        const blob = await imageCapture.takePhoto(opts);
-        saveBlob(blob, makeFilename());
-      }catch(e){
-        console.warn('ImageCapture.takePhoto failed, falling back to canvas capture',e);
-        captureFromVideo();
-      }
-    }else{
-      captureFromVideo();
-    }
-  }
-
-  function makeFilename(){
-    const t = new Date(); const iso = t.toISOString().replace(/[:.]/g,'-'); return `puresun_${iso}.jpg`;
-  }
-
-  function captureFromVideo(){
-    // fallback - will incur browser encoding
-    const w = video.videoWidth; const h = video.videoHeight; const c = document.createElement('canvas'); c.width=w; c.height=h; const cx=c.getContext('2d'); cx.drawImage(video,0,0,w,h);
-    c.toBlob(blob=>{saveBlob(blob, makeFilename())},'image/jpeg',1);
-  }
-
-  async function bracketCapture(n=3){
-    // simple bracket: adjust exposure range around current value
-    const orig = parseFloat(exposureRange.value)||50; const step = (exposureRange.max - exposureRange.min)/20 || 1;
-    for(let i=0;i<n;i++){
-      const val = orig + (i-Math.floor(n/2))*step;
-      try{ if(track && track.applyConstraints) await track.applyConstraints({advanced:[{exposureTime:val}]}); }catch(e){}
-      await new Promise(r=>setTimeout(r,300));
-      await takePhoto();
-    }
-    // restore
-    try{ if(track && track.applyConstraints) await track.applyConstraints({advanced:[{exposureTime:orig}]}); }catch(e){}
-  }
-
-  function saveBlob(blob, filename){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000);
-  }
-
-  // histogram drawing
-  function drawHistogram(){
-    if(video.videoWidth>0){
-      const vw = video.videoWidth, vh = video.videoHeight; const c=document.createElement('canvas'); c.width=vw; c.height=vh; const cx=c.getContext('2d'); cx.drawImage(video,0,0,vw,vh);
-      try{
-        const data = cx.getImageData(0,0,vw,vh).data; const hist=new Uint32Array(256);
-        for(let i=0;i<data.length;i+=4){ const r=data[i],g=data[i+1],b=data[i+2]; const l = Math.round(0.2126*r+0.7152*g+0.0722*b); hist[l]++; }
-        // draw
-        ctxHist.clearRect(0,0,histCanvas.width,histCanvas.height);
-        const max = Math.max(...hist);
-        const w = histCanvas.width, h = histCanvas.height; const barW = w/256;
-        for(let i=0;i<256;i++){ const val = hist[i]/max; ctxHist.fillStyle='rgba(255,255,255,0.8)'; ctxHist.fillRect(i*barW, h - val*h, barW, val*h); }
-      }catch(e){/*cross-origin or not ready*/}
-    }
-    requestAnimationFrame(drawHistogram);
-  }
-
-  // initialise
-  await listDevices(); await startStream();
-
-  // resize histogram canvas to CSS size
-  function fitHist(){ histCanvas.width = histCanvas.clientWidth * devicePixelRatio; histCanvas.height = histCanvas.clientHeight * devicePixelRatio; ctxHist.scale(devicePixelRatio,devicePixelRatio);} fitHist(); window.addEventListener('resize',fitHist);
-
 })();
 </script>
+
 </body>
 </html>
