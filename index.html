@@ -1,82 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PureSun Camera v1.1</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PureSun Camera v1.2</title>
 <style>
+  /* Reset and base */
   html, body {
     margin: 0;
     padding: 0;
-    height: 100%;
-    overflow: hidden;
+    background: #111;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 12px 16px;
+    background: #222;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.25rem;
+    border-bottom: 1px solid #444;
+  }
+
+  main {
+    flex: 1;
+    position: relative;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  video {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+    object-fit: contain;
     background: black;
   }
-  video {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1); /* natural mirror view for front camera */
+
+  footer {
+    background: #222;
+    border-top: 1px solid #444;
+    padding: 12px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
   }
+
   #captureButton {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 15px 25px;
-    font-size: 18px;
-    background: rgba(255, 255, 255, 0.3);
-    border: 2px solid white;
-    color: white;
-    border-radius: 50px;
+    padding: 16px 32px;
+    font-size: 1.3rem;
+    color: #111;
+    background: #e0e0e0;
+    border: none;
+    border-radius: 40px;
     cursor: pointer;
     user-select: none;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    transition: background-color 0.2s ease;
   }
+
   #captureButton:active {
-    background: rgba(255, 255, 255, 0.5);
+    background: #c4c4c4;
+  }
+
+  #lastPhoto {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+    box-shadow: 0 0 8px rgba(255,255,255,0.3);
+    background: #333;
   }
 </style>
 </head>
 <body>
 
-<video id="camera" autoplay playsinline></video>
-<button id="captureButton">ðŸ“¸</button>
+<header>PureSun Camera v1.2</header>
+
+<main>
+  <video id="camera" autoplay playsinline></video>
+</main>
+
+<footer>
+  <button id="captureButton" aria-label="Capture photo">📸 Capture</button>
+  <img id="lastPhoto" alt="Last photo preview" />
+</footer>
+
 <canvas id="canvas" style="display:none;"></canvas>
 
 <script>
 (async () => {
   try {
+    // Request rear camera (back) with fallback for broader support
     const constraints = {
       video: {
-        facingMode: "user" // front camera
+        facingMode: { exact: "environment" }
       },
       audio: false
     };
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const video = document.getElementById('camera');
+    let stream = null;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+      // Fallback to any camera if environment exact not supported
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      console.warn("Falling back to default camera:", err);
+    }
+
+    const video = document.getElementById("camera");
     video.srcObject = stream;
 
-    const captureButton = document.getElementById('captureButton');
-    const canvas = document.getElementById('canvas');
+    const captureButton = document.getElementById("captureButton");
+    const canvas = document.getElementById("canvas");
+    const lastPhoto = document.getElementById("lastPhoto");
 
-    captureButton.addEventListener('click', () => {
+    captureButton.addEventListener("click", () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const image = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = image;
-      a.download = 'photo.png';
-      a.click();
-    });
+      canvas.toBlob(blob => {
+        // Create local URL for preview thumbnail
+        const url = URL.createObjectURL(blob);
+        lastPhoto.src = url;
 
+        // Download the image
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `photo_${Date.now()}.png`;
+        a.click();
+
+        // Release the URL object after some time
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }, "image/png");
+    });
   } catch (err) {
-    alert('Camera access denied or unavailable.');
+    alert("Camera access denied or unavailable.");
     console.error(err);
   }
 })();
